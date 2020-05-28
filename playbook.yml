@@ -1,0 +1,110 @@
+---
+- name: Work with Nginx server
+  hosts: worked_servers
+  # Run as root on management server
+  become: yes
+
+  tasks:
+
+
+  #-------- Get status Nginx --------
+  - name: Get status 1 Nginx
+    shell: "systemctl status nginx.service"
+    register: nginx_status_1
+    # At this moment Nginx may be dead
+    ignore_errors: yes
+    # Do not print 'fatal failed'
+    failed_when: nginx_status_1.rc > 0 and nginx_status_1.rc < 3
+  - name: Print status 1 Nginx 
+    debug:
+       msg: "{{ nginx_status_1.stdout_lines[2] }}"
+
+
+
+
+  #-------- Start Nginx --------
+  - name: Start Nginx server
+    service: name=nginx state=started
+
+  - name: Get status 2 Nginx
+    shell: "systemctl status nginx.service"
+    register: nginx_status_2
+  - name: Print status 2 Nginx
+    debug:
+       msg: "{{ nginx_status_2.stdout_lines[2] }}"
+
+
+
+
+  #-------- Create healfcheck Nginx --------
+  - name: Healfcheck Nginx
+    shell: "curl -I http://localhost:80/"
+    register: healfcheck_nginx
+    ignore_errors: yes
+  - name: Result successfully healfcheck Nginx
+    debug:
+       msg: "The web server passed successfully healfcheck"
+    when: healfcheck_nginx.rc == 0
+  - name: Result unsuccessfully healfcheck Nginx
+    debug:
+       msg: "!!!!The web server passed unsuccessfully healfcheck!!!!"
+    when: healfcheck_nginx.rc != 0
+
+
+
+
+  #-------- Check Nginx configuration --------
+  - name: Check Nginx configuration
+    shell: "nginx -t"
+    register: nginx_configuration_status
+
+  - name: Print status-code Nginx (Return code)
+    debug:
+       msg: "{{ nginx_configuration_status.rc }}"
+
+
+
+  #-------- Stop Nginx server --------
+  - name: Stop Nginx server
+    #command: "nginx -s stop"
+    service:
+       name: nginx
+       state: stopped
+    when: nginx_configuration_status.rc == 0
+
+  - name: Get status 3 Nginx
+    shell: "systemctl status nginx.service"
+    register: nginx_status_3
+    # At this moment Nginx is dead
+    ignore_errors: yes
+    # Do not print 'fatal failed'
+    failed_when: nginx_status_3.rc > 0 and nginx_status_3.rc < 3
+
+  - name: Print status 3 Nginx
+    debug:
+       msg: "{{ nginx_status_3.stdout_lines[2] }}"
+
+
+
+
+
+  #-------- Create healfcheck Nginx --------
+  - name: Healfcheck Nginx
+    uri:
+       url: http://localhost:80/
+       method: HEAD
+    register: healfcheck_nginx_2
+    ignore_errors: yes
+    failed_when: healfcheck_nginx_2.status is undefined or healfcheck_nginx_2.status <= 0  
+  - name: DBG
+    debug:
+       msg: "{{ healfcheck_nginx_2  }}"
+
+  - name: Result successfully healfcheck Nginx
+    debug:
+       msg: "The web server passed successfully healfcheck"
+    when: healfcheck_nginx_2.status == 0 
+  - name: Result unsuccessfully healfcheck Nginx
+    debug:
+       msg: "!!!!The web server passed unsuccessfully healfcheck!!!!"
+    when: healfcheck_nginx_2.status != 0
